@@ -1,10 +1,18 @@
 import sys
 from visa.exception import USVisaException
-from visa.logger import logging 
+from visa.logger import logging
+ 
 from visa.components.data_ingestion import DataIngestion
 from visa.components.data_validation import DataValidation
-from visa.entity.config_entity import DataIngestionConfig, DataValidationConfig
-from visa.entity.artifact_entity import DataIngestionArtifact, DataValidationArtifact
+from visa.components.data_transformation import DataTransformation
+
+from visa.entity.config_entity import (DataIngestionConfig, 
+                                       DataValidationConfig,
+                                       DataTransformationConfig)
+
+from visa.entity.artifact_entity import (DataIngestionArtifact, 
+                                         DataValidationArtifact, 
+                                         DataTransformationArtifact)
 
 
 class TrainingPipeline:
@@ -12,6 +20,7 @@ class TrainingPipeline:
         try:
             self.data_ingestion_config = DataIngestionConfig()
             self.data_validation_config = DataValidationConfig()
+            self.data_transformation_config = DataTransformationConfig()
         except Exception as e:
             raise USVisaException(e, sys) from e
         
@@ -50,6 +59,30 @@ class TrainingPipeline:
         except Exception as e:
             raise USVisaException(e, sys) from e
         
+        
+    def start_data_transformation(self, data_ingestion_artifact: DataIngestionArtifact, data_validation_artifact: DataValidationArtifact) -> DataTransformationArtifact:
+        """
+        This function starts the data transformation of the training pipeline and returns the 
+        artifact of data transformation containing the file paths of the transformed training and testing data and the preprocessor object.
+
+        Input           :  data_ingestion_artifact: DataIngestionArtifact containing the file paths of the ingested training and testing data
+                         :  data_validation_artifact: DataValidationArtifact containing the validation status, message and file path of the drift report
+        Output          :  DataTransformationArtifact containing the file paths of the transformed training and testing data and the preprocessor object
+        on Failure      :  raise exception
+        """
+        try:
+            logging.info(f"Data Transformation of the TrainingPipeline is started")
+            data_transformation = DataTransformation(data_ingestion_artifact=data_ingestion_artifact, 
+                                                     data_validation_artifact=data_validation_artifact,
+                                                     data_transformation_config=self.data_transformation_config)
+            data_transformation_artifact = data_transformation.initiate_data_transformation()
+            logging.info(f"Data Transformation of the TrainingPipeline is completed")   
+            return data_transformation_artifact
+        except Exception as e:
+            raise USVisaException(e, sys) from e
+        
+    
+        
     def run_pipeline(self):
         """
         This function runs the entire training pipeline.
@@ -59,5 +92,7 @@ class TrainingPipeline:
         try:
             data_ingestion_artifact = self.start_data_ingestion()
             data_validation_artifact = self.start_data_validation(data_ingestion_artifact=data_ingestion_artifact)
+            data_transformation_artifact = self.start_data_transformation(data_ingestion_artifact=data_ingestion_artifact, 
+                                                                          data_validation_artifact=data_validation_artifact)
         except Exception as e:
             raise USVisaException(e, sys) from e
