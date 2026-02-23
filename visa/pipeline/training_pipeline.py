@@ -5,15 +5,17 @@ from visa.logger import logging
 from visa.components.data_ingestion import DataIngestion
 from visa.components.data_validation import DataValidation
 from visa.components.data_transformation import DataTransformation
+from visa.components.model_trainer import ModelTrainer
 
 from visa.entity.config_entity import (DataIngestionConfig, 
                                        DataValidationConfig,
-                                       DataTransformationConfig)
+                                       DataTransformationConfig,
+                                       ModelTrainerConfig)
 
 from visa.entity.artifact_entity import (DataIngestionArtifact, 
                                          DataValidationArtifact, 
-                                         DataTransformationArtifact)
-
+                                         DataTransformationArtifact,
+                                         ModelTrainerArtifact)
 
 class TrainingPipeline:
     def __init__(self):
@@ -21,6 +23,7 @@ class TrainingPipeline:
             self.data_ingestion_config = DataIngestionConfig()
             self.data_validation_config = DataValidationConfig()
             self.data_transformation_config = DataTransformationConfig()
+            self.model_trainer_config = ModelTrainerConfig()
         except Exception as e:
             raise USVisaException(e, sys) from e
         
@@ -81,6 +84,25 @@ class TrainingPipeline:
         except Exception as e:
             raise USVisaException(e, sys) from e
         
+        
+    def start_model_trainer(self, data_transformation_artifact: DataTransformationArtifact) -> ModelTrainerArtifact:
+        """
+        This function starts the model trainer of the training pipeline and returns the 
+        artifact of model trainer containing the file path of the trained model and the metric artifact.
+
+        Input           :  data_transformation_artifact: DataTransformationArtifact containing the file paths of the transformed training and testing data and the preprocessor object
+        Output          :  ModelTrainerArtifact containing the file path of the trained model and the metric artifact
+        on Failure      :  raise exception      
+        """
+        try:
+            logging.info(f"Model Trainer of the TrainingPipeline is started")
+            model_trainer = ModelTrainer(model_trainer_config=self.model_trainer_config, data_transformation_artifact=data_transformation_artifact)
+            model_trainer_artifact = model_trainer.initiate_model_trainer()
+            logging.info(f"Model Trainer of the TrainingPipeline is completed")
+            return model_trainer_artifact
+        except Exception as e:
+            raise USVisaException(e, sys) from e
+        
     
         
     def run_pipeline(self):
@@ -94,5 +116,6 @@ class TrainingPipeline:
             data_validation_artifact = self.start_data_validation(data_ingestion_artifact=data_ingestion_artifact)
             data_transformation_artifact = self.start_data_transformation(data_ingestion_artifact=data_ingestion_artifact, 
                                                                           data_validation_artifact=data_validation_artifact)
+            model_trainer_artifact = self.start_model_trainer(data_transformation_artifact=data_transformation_artifact)
         except Exception as e:
             raise USVisaException(e, sys) from e
